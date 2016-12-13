@@ -1,10 +1,12 @@
 import locale
 import curses
-from curses import panel
+# from curses import panel
 from celz.data import Workbook
+from celz.display import Menu
 
 locale.setlocale(locale.LC_ALL, '')
 code = locale.getpreferredencoding()
+
 
 class Direction(object):
     UP = 0
@@ -13,17 +15,26 @@ class Direction(object):
     RIGHT = 3
 
 
+class Keys(object):
+    UP = (ord('k'), curses.KEY_UP)
+    DOWN = (ord('j'), curses.KEY_DOWN)
+    LEFT = (ord('h'), curses.KEY_LEFT)
+    RIGHT = (ord('l'), curses.KEY_RIGHT)
+
+
 class Celz(object):
     def __init__(self, f):
         self.workbook = Workbook(f)
         self.menu = None
         self.datapanel = None
         self.sheetpads = []
+        self.display_objects = []
         curses.wrapper(self.run)
 
     def run(self, stdscr):
         self.stdscr = stdscr
         self.stdscr.clear()
+        self.stdscr.move(2, 0)
         """
         self.datapanel = panel.new_panel(self.stdscr)
         self.datapanel.move(3, 0)
@@ -33,12 +44,9 @@ class Celz(object):
         # for sheet in range(0, self.workbook.numsheets):
         #     self.sheetpads.append(curses.newpad(1000, 1000)
         """
-        self.setupmenu()
+        self.menu = Menu(self, self.stdscr)
+        self.display_objects.append(self.menu)
         self.run_forever()
-
-    def setupmenu(self):
-        self.stdscr.addstr(0, 0, "File | Edit | View | Blah | Blah | Blah")
-        self.stdscr.refresh()
 
     def maxl(self):
         return curses.LINES - 1
@@ -58,22 +66,24 @@ class Celz(object):
             pos[1] = pos[1] - 1 if pos[1] > 0 else 0
         elif direction == Direction.RIGHT:
             pos[1] = pos[1] + 1 if pos[1] < self.maxc() else self.maxc()
-
         self.stdscr.move(*pos)
 
     def run_forever(self):
         while True:
             self.stdscr.refresh()
-            self.interpret_key(self.stdscr.getkey())
+            if self.get_input():
+                return
 
-    def interpret_key(self, k):
-            if k == 'q':
-                raise SystemExit
-            elif k == 'j':
-                self.move_cursor(Direction.DOWN)
-            elif k == 'k':
-                self.move_cursor(Direction.UP)
-            elif k == 'h':
-                self.move_cursor(Direction.LEFT)
-            elif k == 'l':
-                self.move_cursor(Direction.RIGHT)
+    def get_input(self):
+        k = self.stdscr.getch()
+        if k == ord('q'):
+            return True
+        elif k in Keys.DOWN:
+            self.move_cursor(Direction.DOWN)
+        elif k in Keys.UP:
+            self.move_cursor(Direction.UP)
+        elif k in Keys.LEFT:
+            self.move_cursor(Direction.LEFT)
+        elif k in Keys.RIGHT:
+            self.move_cursor(Direction.RIGHT)
+        return False
