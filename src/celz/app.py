@@ -2,7 +2,8 @@ import locale
 import curses
 # from curses import panel
 from celz.data import Workbook
-from celz.display import Menu
+from celz.display import Menu, Sheet
+from celz.keys import K
 
 locale.setlocale(locale.LC_ALL, '')
 code = locale.getpreferredencoding()
@@ -15,19 +16,10 @@ class Direction(object):
     RIGHT = 3
 
 
-class Keys(object):
-    UP = (ord('k'), curses.KEY_UP)
-    DOWN = (ord('j'), curses.KEY_DOWN)
-    LEFT = (ord('h'), curses.KEY_LEFT)
-    RIGHT = (ord('l'), curses.KEY_RIGHT)
-
-
 class Celz(object):
     def __init__(self, f):
         self.workbook = Workbook(f)
         self.menu = None
-        self.datapanel = None
-        self.sheetpads = []
         self.display_objects = []
         curses.wrapper(self.run)
 
@@ -35,16 +27,8 @@ class Celz(object):
         self.stdscr = stdscr
         self.stdscr.clear()
         self.stdscr.move(2, 0)
-        """
-        self.datapanel = panel.new_panel(self.stdscr)
-        self.datapanel.move(3, 0)
-        self.datapanel.window().box()
-        self.datapanel.top()
-        self.datapanel.show()
-        # for sheet in range(0, self.workbook.numsheets):
-        #     self.sheetpads.append(curses.newpad(1000, 1000)
-        """
-        self.menu = Menu(self, self.stdscr)
+        self.menu = Menu(self)
+        self.sheet = Sheet(self, self.workbook.spreadsheet, self.menu.height)
         self.display_objects.append(self.menu)
         self.run_forever()
 
@@ -76,14 +60,21 @@ class Celz(object):
 
     def get_input(self):
         k = self.stdscr.getch()
-        if k == ord('q'):
+        if k in K.QUIT:
             return True
-        elif k in Keys.DOWN:
+        elif k in K.DOWN:
             self.move_cursor(Direction.DOWN)
-        elif k in Keys.UP:
+        elif k in K.UP:
             self.move_cursor(Direction.UP)
-        elif k in Keys.LEFT:
+        elif k in K.LEFT:
             self.move_cursor(Direction.LEFT)
-        elif k in Keys.RIGHT:
+        elif k in K.RIGHT:
             self.move_cursor(Direction.RIGHT)
         return False
+
+    def refresh(self):
+        self.stdscr.refresh()
+
+    def refreshall(self):
+        for d in self.display_objects:
+            d.refresh()
