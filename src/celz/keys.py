@@ -8,10 +8,19 @@ class Key(object):
 
 K = Key()
 
-L = dict([(k, ord(k)) for k in string.ascii_uppercase + string.ascii_lowercase])
+K.__dict__.update(dict([(k, ord(k)) for k in string.ascii_uppercase +
+                        string.ascii_lowercase]))
 
-K.UP = (ord('k'), curses.KEY_UP)
-K.DOWN = (ord('j'), curses.KEY_DOWN)
-K.LEFT = (ord('h'), curses.KEY_LEFT)
-K.RIGHT = (ord('l'), curses.KEY_RIGHT)
-K.QUIT = (L['q'],)
+K.UP = curses.KEY_UP
+K.DOWN = curses.KEY_DOWN
+K.LEFT = curses.KEY_LEFT
+K.RIGHT = curses.KEY_RIGHT
+
+
+class Command(object):
+    UP = (K.k, K.UP)
+    DOWN = (K.j, K.DOWN)
+    LEFT = (K.h, K.LEFT)
+    RIGHT = (K.l, K.RIGHT)
+    QUIT = (K.q,)
+    CURMOVE = (list(UP) + list(DOWN) + list(LEFT) + list(RIGHT))
