@@ -17,7 +17,7 @@ class Spreadsheet(object):
         self.selection.update(row, col)
 
     def rowcol2yx(self, row, col):
-        return row, col*self.colwidth
+        return row+2, (col*(self.colwidth+1))+1, self.colwidth
 
 
 class Row(object):
