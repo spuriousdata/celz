@@ -43,10 +43,6 @@ class Celz(object):
             x = x - 1 if x > 0 else 0
         elif key in Command.RIGHT:
             x = x + 1 if x < self.maxc() else self.maxc()
-        if x == -1:
-            x = 0
-        if y == -1:
-            y = 0
         self.sheet.select(y, x)
 
     def run_forever(self):

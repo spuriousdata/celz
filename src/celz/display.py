@@ -37,37 +37,75 @@ class Sheet(Displayable):
         self.y = y
         self.datasrc = datasrc
         super(Sheet, self).__init__(owner)
-        self.window = curses.newpad(1000, 1000)
+        rows = len(self.datasrc.rowmgr.rows)+10
+        self.rows = rows
+        cols = len(self.datasrc.rowmgr.rows[0].render())+1
+        self.cols = cols
+        self.window = curses.newpad(rows, cols)
+        self.scroll = (0, 0)
         rownum = 0
-        for row in self.datasrc.rows:
-            self.window.addstr(rownum, 1, row.render())
+        for row in self.datasrc.rowmgr.rows:
+            try:
+                self.window.addstr(rownum, 1, row.render())
+            except:
+                logger.critical("addstr(%d, 1, \"%s\") rowcount: %d, strlen: %d, colcount: %d", rownum, row.render(), rows, len(row.render()), cols)
+                raise
             if rownum == 0:
-                self.window.hline(1, 1, curses.ACS_HLINE, curses.COLS)
+                self.window.hline(1, 1, curses.ACS_HLINE, cols)
                 rownum += 1
             rownum += 1
-            if rownum == (self.height-1):
-                break
-        for x in range(11, curses.COLS, 11):
-            self.window.vline(0, x, curses.ACS_VLINE, self.height)
+        for x in range(11, cols, 11):
+            self.window.vline(0, x, curses.ACS_VLINE, rows)
         self.refresh()
+
+    def setscroll(self, r, c):
+        self.scroll = (max(0, r), max(0, c))
 
     @property
     def height(self):
         return curses.LINES - self.y
 
+    @property
+    def width(self):
+        return curses.COLS - 2
+
     def refresh(self):
         super(Sheet, self).refresh(False)
-        self.window.refresh(0, 0, self.y, 0, self.height, curses.COLS-2)
+        logger.debug("refresh(%d, %d, %d, %d, %d, %d)", self.scroll[0], self.datasrc.rowmgr.leftof(self.scroll[1]), self.y, 0, self.height, self.width)
+        self.window.refresh(self.scroll[0], self.datasrc.rowmgr.leftof(self.scroll[1]), self.y, 0, self.height, self.width)
+
+    def hscroll(self, direction):
+        """ direction should be 1 or -1 """
+        logger.debug("Scrolling to (%d, %d)", self.scroll[0], self.scroll[1]+direction)
+        self.setscroll(self.scroll[0], self.scroll[1]+direction)
+        self.refresh()
+
+    def vscroll(self, direction):
+        """ direction should be 1 or -1 """
+        logger.debug("Scrolling to (%d, %d)", self.scroll[0]+direction, self.scroll[1])
+        self.setscroll(self.scroll[0]+direction, self.scroll[1])
+        self.refresh()
 
     def select(self, row, col):
+        if self.scroll == (0, 0) and -1 in (row, col):
+            row, col = (0, 0)
         oldsel = self.datasrc.selection
         if -1 not in (oldsel.row, oldsel.col):
-            y, x, span = self.datasrc.rowcol2yx(oldsel.row, oldsel.col)
-            self.window.chgat(y, x, span, 0)
+            span = self.datasrc.get_span(oldsel.row, oldsel.col)
+            self.window.chgat(span.y, span.x, span.len, 0)
 
-        self.datasrc.selection.update(row, col)
-        y, x, span = self.datasrc.rowcol2yx(row, col)
-        logger.debug("Moving mouse to row: %d, col: %d, x: %d, y: %d",
-                     row, col, y, x)
-        self.window.chgat(y, x, span, curses.A_STANDOUT)
+        span = self.datasrc.select(row, col)
+        logger.debug("Moving selection to row: %d, col: %d, y: %d, x: %d",
+                     row, col, span.y, span.x)
+        if span.x > self.width:
+            logger.debug("Scrolling right, span.x: %d > self.width: %d",
+                         span.x, self.width)
+            self.hscroll(1)
+        elif span.x < self.datasrc.rowmgr.leftof(self.scroll[1]):
+            logger.debug("Scrolling left, span.x: %d < self.scroll[1]: %d",
+                         span.x, self.scroll[1])
+            self.hscroll(-1)
+        else:
+            logger.debug("span.x(%d), self.width(%d), self.scroll(%d, %d)", span.x, self.width, self.scroll[0], self.scroll[1])
+        self.window.chgat(span.y, span.x, span.len, curses.A_STANDOUT)
         self.refresh()

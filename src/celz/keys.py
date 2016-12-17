@@ -2,6 +2,13 @@ import string
 import curses
 
 
+def append_tuples(*args):
+    t = []
+    for x in args:
+        t += list(x)
+    return tuple(t)
+
+
 class Key(object):
     pass
 
@@ -22,5 +29,5 @@ class Command(object):
     DOWN = (K.j, K.DOWN)
     LEFT = (K.h, K.LEFT)
     RIGHT = (K.l, K.RIGHT)
+    CURMOVE = append_tuples(UP, DOWN, LEFT, RIGHT)
     QUIT = (K.q,)
-    CURMOVE = (list(UP) + list(DOWN) + list(LEFT) + list(RIGHT))
