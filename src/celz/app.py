@@ -36,13 +36,13 @@ class Celz(object):
         sel = self.sheet.datasrc.selection
         x, y = sel.col, sel.row
         if key in Command.UP:
-            y = y - 1 if y > 0 else 0
+            y = max(0, y - 1)
         elif key in Command.DOWN:
-            y = y + 1 if y < self.maxl() else self.maxl()
+            y = y + 1
         elif key in Command.LEFT:
-            x = x - 1 if x > 0 else 0
+            x = max(0, x - 1)
         elif key in Command.RIGHT:
-            x = x + 1 if x < self.maxc() else self.maxc()
+            x = x + 1
         self.sheet.select(y, x)
 
     def run_forever(self):

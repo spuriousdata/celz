@@ -56,6 +56,18 @@ class RowManager(object):
     def leftof(self, col):
         return sum(self.columns[:col])
 
+    @property
+    def rowwidth(self):
+        return sum(self.columns)
+
+    @property
+    def rowcount(self):
+        return len(self.rows)
+
+    @property
+    def colcount(self):
+        return len(self.columns)
+
 
 class Row(object):
     def __init__(self, sheet, row):

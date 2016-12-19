@@ -1,7 +1,10 @@
 import curses
 import logging
+from collections import namedtuple
 
 logger = logging.getLogger()
+
+Scroll = namedtuple('Scoll', ['y', 'x'])
 
 
 class Displayable(object):
@@ -37,12 +40,12 @@ class Sheet(Displayable):
         self.y = y
         self.datasrc = datasrc
         super(Sheet, self).__init__(owner)
-        rows = len(self.datasrc.rowmgr.rows)+10
+        rows = self.datasrc.rowmgr.rowcount+10
         self.rows = rows
-        cols = len(self.datasrc.rowmgr.rows[0].render())+1
+        cols = self.datasrc.rowmgr.rowwidth+1
         self.cols = cols
         self.window = curses.newpad(rows, cols)
-        self.scroll = (0, 0)
+        self.scroll = Scroll(0, 0)
         rownum = 0
         for row in self.datasrc.rowmgr.rows:
             try:
@@ -61,10 +64,10 @@ class Sheet(Displayable):
         self.refresh()
 
     def addscroll(self, r=0, c=0):
-        self.setscroll(self.scroll[0]+r, self.scroll[1]+c)
+        self.setscroll(self.scroll.y+r, self.scroll.x+c)
 
     def setscroll(self, r, c):
-        self.scroll = (max(0, r), max(0, c))
+        self.scroll = Scroll(max(0, r), max(0, c))
 
     @property
     def height(self):
@@ -74,13 +77,21 @@ class Sheet(Displayable):
     def width(self):
         return curses.COLS - 2
 
+    @property
+    def bottom(self):
+        return self.scroll.y + (self.height - 2)
+
+    @property
+    def right(self):
+        return self.scroll.x + self.width
+
     def refresh(self):
         super(Sheet, self).refresh(False)
-        logger.debug("refresh(%d, %d, %d, %d, %d, %d)", self.scroll[0],
-                     self.datasrc.rowmgr.leftof(self.scroll[1]), self.y, 0,
+        logger.debug("refresh(%d, %d, %d, %d, %d, %d)", self.scroll.y,
+                     self.datasrc.rowmgr.leftof(self.scroll.x), self.y, 0,
                      self.height, self.width)
-        self.window.refresh(self.scroll[0],
-                            self.datasrc.rowmgr.leftof(self.scroll[1]), self.y,
+        self.window.refresh(self.scroll.y,
+                            self.datasrc.rowmgr.leftof(self.scroll.x), self.y,
                             0, self.height, self.width)
 
     def hscroll(self, direction):
@@ -98,33 +109,55 @@ class Sheet(Displayable):
     def select(self, row, col):
         if self.scroll == (0, 0) and -1 in (row, col):
             row, col = (0, 0)
+        if row > self.datasrc.rowmgr.rowcount or \
+                col > self.datasrc.rowmgr.colcount:
+            return
+        logger.debug("row: %d < rows: %d & col: %d < cols: %d",
+                     row, self.datasrc.rowmgr.rowcount, col,
+                     self.datasrc.rowmgr.colcount)
+        dirty = False
         oldsel = self.datasrc.selection
         if -1 not in (oldsel.row, oldsel.col):
             span = self.datasrc.get_span(oldsel.row, oldsel.col)
-            self.window.chgat(span.y, span.x, span.len, 0)
+            try:
+                self.window.chgat(span.y, span.x, span.len, 0)
+                dirty = True
+            except:
+                pass
 
         span = self.datasrc.select(row, col)
         logger.debug("Moving selection to row: %d, col: %d, y: %d, x: %d",
                      row, col, span.y, span.x)
-        if span.x > self.width:
-            logger.debug("Scrolling right, span.x: %d > self.width: %d",
-                         span.x, self.width)
+        if span.x > self.right:
+            logger.debug("Scrolling right, span.x: %d > self.right: %d",
+                         span.x, self.right)
             self.hscroll(1)
-        elif span.x < self.datasrc.rowmgr.leftof(self.scroll[1]):
-            logger.debug("Scrolling left, span.x: %d < self.scroll[1]: %d",
-                         span.x, self.scroll[1])
+            dirty = True
+        elif span.x < self.datasrc.rowmgr.leftof(self.scroll.x):
+            logger.debug("Scrolling left, span.x: %d < self.scroll.x: %d",
+                         span.x, self.scroll.x)
             self.hscroll(-1)
-        elif span.y > (self.height - 2):
-            logger.debug("Scrolling down, span.y: %d > self.height: %d",
-                         span.y, self.height)
+            dirty = True
+        elif span.y > self.bottom:
+            logger.debug("Scrolling down, span.y: %d > self.bottom: %d",
+                         span.y, self.bottom)
             self.vscroll(1)
-        elif span.y < self.scroll[0]:
-            logger.debug("Scrolling up, span.y: %d < self.scroll[0](%d)",
-                         span.y, self.scroll[0])
+            dirty = True
+        elif span.y < self.scroll.y:
+            logger.debug("Scrolling up, span.y: %d < self.scroll.y(%d)",
+                         span.y, self.scroll.y)
             self.vscroll(-1)
+            dirty = True
         else:
-            logger.debug("span.x(%d), span.y(%d) self.width(%d), "
-                         "self.height(%d), self.scroll(%d, %d)",
-                         span.x, span.y, self.width, self.height, *self.scroll)
-        self.window.chgat(span.y, span.x, span.len, curses.A_STANDOUT)
-        self.refresh()
+            logger.debug("Not Scrolling -- span.x(%d), span.y(%d) "
+                         "self.width(%d), self.height(%d), self.bottom(%d), "
+                         "self.y(%d), self.right(%d), self.scroll(%d, %d)",
+                         span.x, span.y, self.width, self.height, self.bottom,
+                         self.y, self.bottom, *self.scroll)
+        try:
+            self.window.chgat(span.y, span.x, span.len, curses.A_STANDOUT)
+            dirty = True
+        except:
+            pass
+        if dirty:
+            self.refresh()
